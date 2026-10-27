@@ -77,7 +77,33 @@ When you click **Hand Over to AI**:
 
 ---
 
-## 🛠️ Architecture & Tech Stack
+## 🗂️ Project & Time Horizon Scoping
+
+Don't want to triage your entire Todoist account all at once? AI-Todo allows you to dynamically scope your focus session:
+
+* **Project Filter:**
+  * Work across **📁 All Projects** or focus on a single workspace (e.g. `#Inbox`, `#life`, `#ML`, `#projects`).
+* **Time Horizon / Quick Filter Pills:**
+  * ⚡ **Today & Overdue:** Instantly clear tasks that demand immediate attention today or slipped past deadline.
+  * 📅 **Today:** Focus strictly on items scheduled for the current date.
+  * ⏳ **Next 7 Days (Near Future):** Plan and triage what is coming up over the coming week.
+  * 🗓️ **Scheduled:** All tasks that have an explicit due date.
+  * 📥 **Someday (No Date):** Review backlog and unassigned tasks without deadlines.
+  * 🌐 **All Tasks:** Full view across the entire active inventory.
+
+Filters seamlessly persist in your browser and automatically update both the 1-by-1 Focus queue and the All Active Tasks table.
+
+---
+
+## 👤 User vs. 🤖 AI Completion Attribution
+
+Every completed task is visibly and permanently attributed:
+* **In Todoist:**
+  * **Tags:** Auto-tagged with `user-completed` or `ai-completed`.
+  * **Comments:** Closed with a structured audit log comment (`👤 **[Completed by User]** Note: ...` or `🤖 **[Completed by AI Agent]** ...`).
+* **In AI-Todo UI:**
+  * **History View (`/history`):** Explicit actor badges (emerald `👤 Completed by User` vs indigo `🤖 Completed by AI Agent`) and filter tabs to audit actions.
+
 
 ```
 ai-todo/
