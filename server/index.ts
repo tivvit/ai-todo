@@ -315,22 +315,61 @@ app.post('/api/todos/:id/postpone', async (req: Request, res: Response) => {
   }
 });
 
-// 7. Hand Over to LLM (Delegation)
+// 7. Hand Over to LLM (Delegation) - Fully Asynchronous
 app.post('/api/todos/:id/delegate', async (req: Request, res: Response) => {
   const id = String(req.params.id);
   const { content, description, userNote, projectId } = req.body;
 
   try {
-    const decision = await agentService.handOverTask({
-      taskId: id,
-      taskContent: content,
-      taskDescription: description,
-      userNote: userNote || '',
-      projectId
+    // 1. Immediately record handover decision in SQLite
+    dbService.recordDecision(id, content, 'delegated', userNote, undefined, undefined, 'user');
+
+    // 2. Register initial task state in DB as in_progress
+    dbService.saveDelegatedTask({
+      task_id: id,
+      content: content || id,
+      project_id: projectId || null,
+      user_note: userNote || null,
+      status: 'in_progress',
+      llm_summary: 'Agent is analyzing task and formulating execution plan...',
+      llm_plan: null,
+      action_log: JSON.stringify([
+        `[${new Date().toISOString()}] Handover received from user. Note: "${userNote || 'None'}"`
+      ])
     });
 
-    dbService.recordDecision(id, content, 'delegated', userNote, undefined, undefined, 'user');
-    res.json({ success: true, decision });
+    // 3. Immediately reply to client so user can continue triaging next task without delay
+    res.json({
+      success: true,
+      message: 'Task handed over to AI. Processing asynchronously in the background.',
+      taskId: id,
+      status: 'in_progress'
+    });
+
+    // 4. Run LLM agent analysis, plan formulation & checker scheduling asynchronously in background
+    agentService
+      .handOverTask({
+        taskId: id,
+        taskContent: content,
+        taskDescription: description,
+        userNote: userNote || '',
+        projectId
+      })
+      .catch(err => {
+        console.error(`[Agent] Asynchronous handover error for task ${id}:`, err);
+        dbService.saveDelegatedTask({
+          task_id: id,
+          content: content || id,
+          project_id: projectId || null,
+          user_note: userNote || null,
+          status: 'failed',
+          llm_summary: `Agent error: ${err.message}`,
+          llm_plan: null,
+          action_log: JSON.stringify([
+            `[${new Date().toISOString()}] Handover failed: ${err.message}`
+          ])
+        });
+      });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
