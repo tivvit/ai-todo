@@ -25,6 +25,7 @@ export const DelegatedDashboard: React.FC<DelegatedDashboardProps> = ({ onRefres
   const [filter, setFilter] = useState<'all' | 'waiting' | 'surfaced' | 'completed'>('all');
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
   const [triggeringId, setTriggeringId] = useState<number | null>(null);
+  const [completingId, setCompletingId] = useState<string | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<{ id: number; text: string } | null>(null);
 
   const fetchDelegated = async () => {
@@ -68,6 +69,31 @@ export const DelegatedDashboard: React.FC<DelegatedDashboardProps> = ({ onRefres
       alert(err.message);
     } finally {
       setTriggeringId(null);
+    }
+  };
+
+  const handleCompleteByAI = async (task: DelegatedTask) => {
+    setCompletingId(task.task_id);
+    try {
+      const res = await fetch(`/api/todos/${task.task_id}/ai-complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: task.content,
+          summary: task.llm_summary || 'Resolved autonomously by Antigravity AI Agent'
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await fetchDelegated();
+        await onRefreshTasks();
+      } else {
+        alert(data.error || 'Failed to mark task complete by AI');
+      }
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setCompletingId(null);
     }
   };
 
@@ -294,6 +320,24 @@ export const DelegatedDashboard: React.FC<DelegatedDashboardProps> = ({ onRefres
                             </div>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Action buttons */}
+                    {task.status !== 'completed' && (
+                      <div className="flex justify-end pt-2">
+                        <button
+                          onClick={() => handleCompleteByAI(task)}
+                          disabled={completingId === task.task_id}
+                          className="flex items-center space-x-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-indigo-600/20"
+                        >
+                          {completingId === task.task_id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                          )}
+                          <span>Mark Resolved by AI (Syncs to Todoist)</span>
+                        </button>
                       </div>
                     )}
                   </div>

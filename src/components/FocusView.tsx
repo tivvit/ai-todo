@@ -27,6 +27,7 @@ interface FocusViewProps {
   ) => Promise<void>;
   onPostpone: (task: TodoItem, reason: string, dueString: string) => Promise<void>;
   onDelegate: (task: TodoItem, note: string) => Promise<void>;
+  onAIDone?: (task: TodoItem) => Promise<void>;
   onRefresh: () => Promise<void>;
 }
 
@@ -38,6 +39,7 @@ export const FocusView: React.FC<FocusViewProps> = ({
   onDoneWithNote,
   onPostpone,
   onDelegate,
+  onAIDone,
   onRefresh,
 }) => {
   const [activeModal, setActiveModal] = useState<'none' | 'note' | 'postpone' | 'delegate'>('none');
@@ -89,6 +91,16 @@ export const FocusView: React.FC<FocusViewProps> = ({
     setIsSubmitting(true);
     try {
       await onDone(currentTask);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAIDoneClick = async () => {
+    if (!currentTask || isSubmitting || !onAIDone) return;
+    setIsSubmitting(true);
+    try {
+      await onAIDone(currentTask);
     } finally {
       setIsSubmitting(false);
     }
@@ -558,6 +570,24 @@ export const FocusView: React.FC<FocusViewProps> = ({
               </button>
             </div>
           </form>
+        )}
+
+        {/* If Delegated: Option to Mark Done by AI */}
+        {currentTask.delegated && (
+          <div className="mb-4 p-3 bg-indigo-950/40 border border-indigo-500/30 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center space-x-2 text-xs text-indigo-300">
+              <Bot className="w-4 h-4 text-indigo-400" />
+              <span>This task is managed by AI. Ready to accept AI's resolution?</span>
+            </div>
+            <button
+              onClick={handleAIDoneClick}
+              disabled={isSubmitting}
+              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center space-x-1.5 shadow-md shadow-indigo-600/30 self-start sm:self-auto"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Mark Completed by AI</span>
+            </button>
+          </div>
         )}
 
         {/* 4 Primary Action Buttons */}

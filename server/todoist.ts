@@ -154,6 +154,31 @@ export class TodoistService {
     });
   }
 
+  async completeByUser(taskId: string, note?: string): Promise<void> {
+    try {
+      const task = await this.getTask(taskId);
+      const labels = Array.from(new Set([...(task.labels || []), 'user-completed']));
+      await this.updateTask(taskId, { labels });
+    } catch {}
+
+    const comment = note
+      ? `👤 **[Completed by User]** Note: ${note}`
+      : `👤 **[Completed by User]** Marked done during 1-by-1 focus session.`;
+    await this.addComment(taskId, comment);
+    await this.closeTask(taskId);
+  }
+
+  async completeByAI(taskId: string, summary: string): Promise<void> {
+    try {
+      const task = await this.getTask(taskId);
+      const labels = Array.from(new Set([...(task.labels || []), 'ai-completed']));
+      await this.updateTask(taskId, { labels });
+    } catch {}
+
+    await this.addComment(taskId, `🤖 **[Completed by AI Agent]** ${summary}`);
+    await this.closeTask(taskId);
+  }
+
   async getComments(taskId: string): Promise<TodoistComment[]> {
     const data = await this.request<{ results: TodoistComment[] }>(`/comments?task_id=${encodeURIComponent(taskId)}`);
     return data.results || [];

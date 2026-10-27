@@ -156,6 +156,28 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleAIDone = async (task: TodoItem) => {
+    try {
+      const res = await fetch(`/api/todos/${task.id}/ai-complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: task.content,
+          summary: task.delegated?.llm_summary || 'Task resolved autonomously by Antigravity Agent'
+        })
+      });
+      if (res.ok) {
+        setTodos(prev => prev.filter(t => t.id !== task.id));
+        fetchStatus();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to mark task done by AI');
+      }
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
       <Header
@@ -196,6 +218,7 @@ export const App: React.FC = () => {
                 onDoneWithNote={handleDoneWithNote}
                 onPostpone={handlePostpone}
                 onDelegate={handleDelegate}
+                onAIDone={handleAIDone}
                 onRefresh={fetchTodos}
               />
             )}

@@ -60,6 +60,7 @@ export interface TaskDecision {
   note: string | null;
   reason: string | null;
   postpone_until: string | null;
+  actor: 'user' | 'ai';
   created_at: string;
 }
 

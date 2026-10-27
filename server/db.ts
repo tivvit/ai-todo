@@ -50,6 +50,7 @@ db.exec(`
     note TEXT,
     reason TEXT,
     postpone_until TEXT,
+    actor TEXT DEFAULT 'user', -- 'user' or 'ai'
     created_at TEXT NOT NULL
   );
 
@@ -59,6 +60,11 @@ db.exec(`
     updated_at TEXT NOT NULL
   );
 `);
+
+// Migration for existing databases to add actor column if missing
+try {
+  db.exec(`ALTER TABLE task_decisions ADD COLUMN actor TEXT DEFAULT 'user'`);
+} catch {}
 
 export interface DelegatedTask {
   task_id: string;
@@ -94,6 +100,7 @@ export interface TaskDecision {
   note: string | null;
   reason: string | null;
   postpone_until: string | null;
+  actor: 'user' | 'ai';
   created_at: string;
 }
 
@@ -211,12 +218,20 @@ export const dbService = {
     stmt.run(...values);
   },
 
-  recordDecision(taskId: string, content: string | null, action: string, note?: string, reason?: string, postpone_until?: string): void {
+  recordDecision(
+    taskId: string,
+    content: string | null,
+    action: string,
+    note?: string,
+    reason?: string,
+    postpone_until?: string,
+    actor: 'user' | 'ai' = 'user'
+  ): void {
     const stmt = db.prepare(`
-      INSERT INTO task_decisions (task_id, content, action, note, reason, postpone_until, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO task_decisions (task_id, content, action, note, reason, postpone_until, actor, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    stmt.run(taskId, content, action, note || null, reason || null, postpone_until || null, new Date().toISOString());
+    stmt.run(taskId, content, action, note || null, reason || null, postpone_until || null, actor, new Date().toISOString());
   },
 
   getRecentDecisions(limit = 20): TaskDecision[] {

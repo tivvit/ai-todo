@@ -142,21 +142,21 @@ app.get('/api/todos/:id/comments', async (req: Request, res: Response) => {
   }
 });
 
-// 4. Mark Done
+// 4. Mark Done (by User)
 app.post('/api/todos/:id/done', async (req: Request, res: Response) => {
   const id = String(req.params.id);
   const { content } = req.body;
   try {
-    await todoist.closeTask(id);
-    dbService.recordDecision(id, content, 'done');
+    await todoist.completeByUser(id);
+    dbService.recordDecision(id, content, 'done', undefined, undefined, undefined, 'user');
     dbService.updateTaskStatus(id, 'completed');
-    res.json({ success: true, message: 'Task marked as done' });
+    res.json({ success: true, message: 'Task marked as done by user' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// 5. Done With Note (with optional Follow-Up Task)
+// 5. Done With Note (by User, with optional Follow-Up Task)
 app.post('/api/todos/:id/done-with-note', async (req: Request, res: Response) => {
   const id = String(req.params.id);
   const { content, note, createFollowUp, followUpTitle, followUpDue, projectId } = req.body;
@@ -167,15 +167,13 @@ app.post('/api/todos/:id/done-with-note', async (req: Request, res: Response) =>
   }
 
   try {
-    // 1. Post note as comment to Todoist
-    await todoist.addComment(id, `📝 **[Completion Note]** ${note.trim()}`);
-    // 2. Close current task in Todoist
-    await todoist.closeTask(id);
-    dbService.recordDecision(id, content, 'done_with_note', note);
+    // Complete in Todoist by user with note comment and user-completed label
+    await todoist.completeByUser(id, note.trim());
+    dbService.recordDecision(id, content, 'done_with_note', note, undefined, undefined, 'user');
     dbService.updateTaskStatus(id, 'completed');
 
     let createdFollowUpTask = null;
-    // 3. Create follow-up todo if requested
+    // Create follow-up todo if requested
     if (createFollowUp) {
       const taskTitle = followUpTitle?.trim() || `Follow-up: ${note.trim()}`;
       const due = followUpDue?.trim() || 'tomorrow';
@@ -191,17 +189,34 @@ app.post('/api/todos/:id/done-with-note', async (req: Request, res: Response) =>
         'created_followup',
         `Follow-up for previous task ${id}`,
         undefined,
-        due
+        due,
+        'user'
       );
     }
 
     res.json({
       success: true,
       message: createFollowUp
-        ? 'Note added, task completed, and follow-up task created in Todoist!'
-        : 'Note added and task marked done',
+        ? 'Task completed by user and follow-up task created in Todoist!'
+        : 'Task completed by user with note',
       followUpTask: createdFollowUpTask
     });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 5b. Mark Done by AI
+app.post('/api/todos/:id/ai-complete', async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const { content, summary } = req.body;
+
+  try {
+    const summaryText = summary?.trim() || 'Resolved autonomously by Antigravity Agent.';
+    await todoist.completeByAI(id, summaryText);
+    dbService.recordDecision(id, content, 'done', summaryText, undefined, undefined, 'ai');
+    dbService.updateTaskStatus(id, 'completed');
+    res.json({ success: true, message: 'Task marked as completed by AI' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -222,7 +237,7 @@ app.post('/api/todos/:id/postpone', async (req: Request, res: Response) => {
     await todoist.updateTask(id, {
       due_string: dueString
     });
-    dbService.recordDecision(id, content, 'postponed', undefined, reasonText, dueString);
+    dbService.recordDecision(id, content, 'postponed', undefined, reasonText, dueString, 'user');
     res.json({ success: true, message: `Task postponed to ${dueString}` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -243,7 +258,7 @@ app.post('/api/todos/:id/delegate', async (req: Request, res: Response) => {
       projectId
     });
 
-    dbService.recordDecision(id, content, 'delegated', userNote);
+    dbService.recordDecision(id, content, 'delegated', userNote, undefined, undefined, 'user');
     res.json({ success: true, decision });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
