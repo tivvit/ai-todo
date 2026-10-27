@@ -130,6 +130,20 @@ export class TodoistService {
     });
   }
 
+  async createTask(params: {
+    content: string;
+    description?: string;
+    project_id?: string;
+    due_string?: string;
+    priority?: number;
+    labels?: string[];
+  }): Promise<TodoistTask> {
+    return await this.request<TodoistTask>('/tasks', {
+      method: 'POST',
+      body: JSON.stringify(params)
+    });
+  }
+
   async addComment(taskId: string, content: string): Promise<TodoistComment> {
     return await this.request<TodoistComment>('/comments', {
       method: 'POST',

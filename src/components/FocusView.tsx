@@ -20,7 +20,11 @@ interface FocusViewProps {
   currentIndex: number;
   setCurrentIndex: (index: number | ((prev: number) => number)) => void;
   onDone: (task: TodoItem) => Promise<void>;
-  onDoneWithNote: (task: TodoItem, note: string) => Promise<void>;
+  onDoneWithNote: (
+    task: TodoItem,
+    note: string,
+    followUp?: { create: boolean; title?: string; due?: string }
+  ) => Promise<void>;
   onPostpone: (task: TodoItem, reason: string, dueString: string) => Promise<void>;
   onDelegate: (task: TodoItem, note: string) => Promise<void>;
   onRefresh: () => Promise<void>;
@@ -38,6 +42,9 @@ export const FocusView: React.FC<FocusViewProps> = ({
 }) => {
   const [activeModal, setActiveModal] = useState<'none' | 'note' | 'postpone' | 'delegate'>('none');
   const [noteText, setNoteText] = useState('');
+  const [createFollowUp, setCreateFollowUp] = useState(false);
+  const [followUpTitle, setFollowUpTitle] = useState('');
+  const [followUpDue, setFollowUpDue] = useState('tomorrow');
   const [postponeReason, setPostponeReason] = useState('');
   const [postponeDue, setPostponeDue] = useState('tomorrow');
   const [delegateNote, setDelegateNote] = useState('');
@@ -92,7 +99,11 @@ export const FocusView: React.FC<FocusViewProps> = ({
     if (!currentTask || !noteText.trim() || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await onDoneWithNote(currentTask, noteText.trim());
+      await onDoneWithNote(currentTask, noteText.trim(), {
+        create: createFollowUp,
+        title: followUpTitle.trim() || `Follow-up: ${noteText.trim()}`,
+        due: followUpDue.trim() || 'tomorrow'
+      });
       setActiveModal('none');
     } finally {
       setIsSubmitting(false);
@@ -322,21 +333,87 @@ export const FocusView: React.FC<FocusViewProps> = ({
         {activeModal === 'note' && (
           <form
             onSubmit={handleDoneWithNoteSubmit}
-            className="mb-6 bg-slate-950 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 shadow-xl animate-fadeIn"
+            className="mb-6 bg-slate-950 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 shadow-xl animate-fadeIn space-y-3"
           >
-            <div className="flex items-center space-x-2 text-emerald-400 font-semibold text-sm mb-2">
+            <div className="flex items-center space-x-2 text-emerald-400 font-semibold text-sm">
               <FileText className="w-4 h-4" />
               <span>Mark Done with Note (Synced to Todoist Comment)</span>
             </div>
             <textarea
               autoFocus
               value={noteText}
-              onChange={e => setNoteText(e.target.value)}
-              placeholder="What did you do? E.g., 'Called customer support, confirmation #98432'..."
+              onChange={e => {
+                setNoteText(e.target.value);
+                if (!followUpTitle) {
+                  setFollowUpTitle(`Follow-up: ${e.target.value}`);
+                }
+              }}
+              placeholder="What did you do? E.g., 'Called customer support, confirmation #98432' or 'Sent email draft'..."
               rows={3}
               className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
             />
-            <div className="flex justify-end space-x-2 mt-3">
+
+            {/* Follow-up task toggle */}
+            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3 space-y-2.5">
+              <label className="flex items-center space-x-2.5 cursor-pointer text-xs font-semibold text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={createFollowUp}
+                  onChange={e => setCreateFollowUp(e.target.checked)}
+                  className="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-emerald-500 w-4 h-4"
+                />
+                <span>Create a follow-up todo from this note in Todoist</span>
+              </label>
+
+              {createFollowUp && (
+                <div className="pt-1.5 border-t border-slate-800 space-y-2">
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">
+                      Follow-up Task Title
+                    </label>
+                    <input
+                      type="text"
+                      value={followUpTitle}
+                      onChange={e => setFollowUpTitle(e.target.value)}
+                      placeholder="e.g. Check if customer support replied"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1">
+                      Due Date for Follow-up
+                    </label>
+                    <div className="flex flex-wrap gap-1.5 mb-1.5">
+                      {['tomorrow', 'in 2 days', 'in 3 days', 'next Monday', 'in 1 week'].map(
+                        preset => (
+                          <button
+                            type="button"
+                            key={preset}
+                            onClick={() => setFollowUpDue(preset)}
+                            className={`text-[10px] px-2 py-0.5 rounded font-medium transition ${
+                              followUpDue === preset
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                : 'bg-slate-800 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            {preset}
+                          </button>
+                        )
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={followUpDue}
+                      onChange={e => setFollowUpDue(e.target.value)}
+                      placeholder="e.g. tomorrow, in 3 days"
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end space-x-2 pt-1">
               <button
                 type="button"
                 onClick={() => setActiveModal('none')}
@@ -350,7 +427,7 @@ export const FocusView: React.FC<FocusViewProps> = ({
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg flex items-center space-x-1.5 transition"
               >
                 {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                <span>Save Note & Complete</span>
+                <span>{createFollowUp ? 'Save Note, Complete & Create Follow-Up' : 'Save Note & Complete'}</span>
               </button>
             </div>
           </form>

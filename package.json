@@ -7,8 +7,10 @@
     "dev": "concurrently -n \"server,client\" -c \"blue,green\" \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "vite",
-    "build": "vite build",
-    "start": "NODE_ENV=production tsx server/index.ts",
+    "build:client": "vite build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build": "npm run build:client && npm run build:server",
+    "start": "NODE_ENV=production node dist/server/index.js",
     "test": "echo \"No test specified\" && exit 0"
   },
   "keywords": [
@@ -31,7 +33,8 @@
     "lucide-react": "^0.475.0",
     "node-cron": "^3.0.3",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "tsx": "^4.19.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",

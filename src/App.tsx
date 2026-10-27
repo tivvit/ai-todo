@@ -75,16 +75,28 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleDoneWithNote = async (task: TodoItem, note: string) => {
+  const handleDoneWithNote = async (
+    task: TodoItem,
+    note: string,
+    followUp?: { create: boolean; title?: string; due?: string }
+  ) => {
     try {
       const res = await fetch(`/api/todos/${task.id}/done-with-note`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: task.content, note })
+        body: JSON.stringify({
+          content: task.content,
+          note,
+          projectId: task.project_id,
+          createFollowUp: followUp?.create || false,
+          followUpTitle: followUp?.title,
+          followUpDue: followUp?.due
+        })
       });
       if (res.ok) {
         setTodos(prev => prev.filter(t => t.id !== task.id));
         fetchStatus();
+        fetchTodos();
       } else {
         const err = await res.json();
         alert(err.error || 'Failed to save note');

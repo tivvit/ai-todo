@@ -6,12 +6,38 @@ import { todoist } from './todoist.js';
 export class CheckerService {
   private cronJob: cron.ScheduledTask | null = null;
   private isChecking = false;
+  private currentCronExpr = CONFIG.CHECKER_CRON;
 
   public start() {
-    console.log(`[Checker] Initializing background checker service with schedule: ${CONFIG.CHECKER_CRON}`);
-    this.cronJob = cron.schedule(CONFIG.CHECKER_CRON, async () => {
+    this.currentCronExpr = dbService.getSetting('checker_cron', CONFIG.CHECKER_CRON);
+    console.log(`[Checker] Initializing background checker service with schedule: ${this.currentCronExpr}`);
+    this.cronJob = cron.schedule(this.currentCronExpr, async () => {
       await this.runPendingChecks();
     });
+  }
+
+  public updateSchedule(cronExpr: string): boolean {
+    if (!cron.validate(cronExpr)) {
+      throw new Error(`Invalid cron expression: "${cronExpr}"`);
+    }
+
+    if (this.cronJob) {
+      this.cronJob.stop();
+    }
+
+    this.currentCronExpr = cronExpr;
+    dbService.setSetting('checker_cron', cronExpr);
+
+    this.cronJob = cron.schedule(cronExpr, async () => {
+      await this.runPendingChecks();
+    });
+
+    console.log(`[Checker] Updated checker cron schedule to: ${cronExpr}`);
+    return true;
+  }
+
+  public getSchedule(): string {
+    return this.currentCronExpr;
   }
 
   public stop() {

@@ -46,6 +46,7 @@ app.get('/api/status', async (req: Request, res: Response) => {
       agyPath: CONFIG.AGY_PATH,
       hasAgy: fs.existsSync(CONFIG.AGY_PATH)
     },
+    checkerCron: checkerService.getSchedule(),
     counts: {
       activeCheckers: activeCheckers.length,
       delegatedTasks: delegated.length
@@ -64,6 +65,21 @@ app.post('/api/settings/token', (req: Request, res: Response) => {
   const tokenFile = path.join(CONFIG.DATA_DIR, 'token.txt');
   fs.writeFileSync(tokenFile, token.trim());
   res.json({ success: true, message: 'Todoist token updated successfully' });
+});
+
+// Update Checker Cron Schedule
+app.post('/api/settings/checker', (req: Request, res: Response) => {
+  const { cron: cronExpr } = req.body;
+  if (!cronExpr || typeof cronExpr !== 'string') {
+    res.status(400).json({ error: 'Cron expression string is required' });
+    return;
+  }
+  try {
+    checkerService.updateSchedule(cronExpr.trim());
+    res.json({ success: true, schedule: checkerService.getSchedule() });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 // 2. Fetch Active Todos
@@ -117,7 +133,7 @@ app.get('/api/todos', async (req: Request, res: Response) => {
 
 // 3. Get Task Comments
 app.get('/api/todos/:id/comments', async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   try {
     const comments = await todoist.getComments(id);
     res.json(comments);
@@ -128,7 +144,7 @@ app.get('/api/todos/:id/comments', async (req: Request, res: Response) => {
 
 // 4. Mark Done
 app.post('/api/todos/:id/done', async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const { content } = req.body;
   try {
     await todoist.closeTask(id);
@@ -140,10 +156,10 @@ app.post('/api/todos/:id/done', async (req: Request, res: Response) => {
   }
 });
 
-// 5. Done With Note
+// 5. Done With Note (with optional Follow-Up Task)
 app.post('/api/todos/:id/done-with-note', async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { content, note } = req.body;
+  const id = String(req.params.id);
+  const { content, note, createFollowUp, followUpTitle, followUpDue, projectId } = req.body;
 
   if (!note || !note.trim()) {
     res.status(400).json({ error: 'Note is required' });
@@ -153,11 +169,39 @@ app.post('/api/todos/:id/done-with-note', async (req: Request, res: Response) =>
   try {
     // 1. Post note as comment to Todoist
     await todoist.addComment(id, `📝 **[Completion Note]** ${note.trim()}`);
-    // 2. Close task in Todoist
+    // 2. Close current task in Todoist
     await todoist.closeTask(id);
     dbService.recordDecision(id, content, 'done_with_note', note);
     dbService.updateTaskStatus(id, 'completed');
-    res.json({ success: true, message: 'Note added and task marked done' });
+
+    let createdFollowUpTask = null;
+    // 3. Create follow-up todo if requested
+    if (createFollowUp) {
+      const taskTitle = followUpTitle?.trim() || `Follow-up: ${note.trim()}`;
+      const due = followUpDue?.trim() || 'tomorrow';
+      createdFollowUpTask = await todoist.createTask({
+        content: taskTitle,
+        description: `Created automatically from completion note of previous task: "${content || id}"\nNote: ${note.trim()}`,
+        due_string: due,
+        project_id: projectId
+      });
+      dbService.recordDecision(
+        createdFollowUpTask.id,
+        taskTitle,
+        'created_followup',
+        `Follow-up for previous task ${id}`,
+        undefined,
+        due
+      );
+    }
+
+    res.json({
+      success: true,
+      message: createFollowUp
+        ? 'Note added, task completed, and follow-up task created in Todoist!'
+        : 'Note added and task marked done',
+      followUpTask: createdFollowUpTask
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -165,7 +209,7 @@ app.post('/api/todos/:id/done-with-note', async (req: Request, res: Response) =>
 
 // 6. Postpone With Reason
 app.post('/api/todos/:id/postpone', async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const { content, reason, dueDateString } = req.body;
 
   const dueString = (dueDateString && dueDateString.trim()) || 'tomorrow';
@@ -187,7 +231,7 @@ app.post('/api/todos/:id/postpone', async (req: Request, res: Response) => {
 
 // 7. Hand Over to LLM (Delegation)
 app.post('/api/todos/:id/delegate', async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const { content, description, userNote, projectId } = req.body;
 
   try {
@@ -230,7 +274,7 @@ app.get('/api/checkers', (req: Request, res: Response) => {
 
 // Trigger a Checker immediately
 app.post('/api/checkers/:id/trigger', async (req: Request, res: Response) => {
-  const checkerId = parseInt(req.params.id, 10);
+  const checkerId = parseInt(String(req.params.id), 10);
   try {
     const result = await checkerService.triggerCheckerNow(checkerId);
     res.json({ success: true, result });

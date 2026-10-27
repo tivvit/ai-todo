@@ -9,8 +9,35 @@ interface SettingsViewProps {
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ status, onRefreshStatus }) => {
   const [newToken, setNewToken] = useState('');
+  const [newCron, setNewCron] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isUpdatingCron, setIsUpdatingCron] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [cronMessage, setCronMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleUpdateCron = async (cronExpr: string) => {
+    setIsUpdatingCron(true);
+    setCronMessage(null);
+    try {
+      const res = await fetch('/api/settings/checker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cron: cronExpr })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setCronMessage({ type: 'success', text: `Checker interval updated to: ${data.schedule}` });
+        setNewCron('');
+        await onRefreshStatus();
+      } else {
+        setCronMessage({ type: 'error', text: data.error || 'Failed to update schedule' });
+      }
+    } catch (err: any) {
+      setCronMessage({ type: 'error', text: err.message });
+    } finally {
+      setIsUpdatingCron(false);
+    }
+  };
 
   const handleUpdateToken = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,6 +152,96 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ status, onRefreshSta
             </p>
           )}
         </form>
+      </div>
+
+      {/* Background Checker Configuration */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div className="flex items-center space-x-3">
+          <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+            <ShieldCheck className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="font-bold text-white text-base">Background Checker Frequency</h3>
+            <p className="text-xs text-slate-400">
+              Configure how frequently the autonomous background loop evaluates waiting checkers & follow-up rules.
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div>
+            <span className="text-slate-400">Current Schedule:</span>
+            <div className="font-mono font-bold text-amber-400 text-sm mt-0.5">
+              {status?.checkerCron || '*/15 * * * *'}
+            </div>
+          </div>
+          <span className="text-slate-400">
+            Dynamically applied without server downtime
+          </span>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-300 mb-2">
+            Quick Frequency Presets
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { label: 'Every 5 mins', cron: '*/5 * * * *' },
+              { label: 'Every 15 mins (Recommended)', cron: '*/15 * * * *' },
+              { label: 'Every 30 mins', cron: '*/30 * * * *' },
+              { label: 'Every 1 hour', cron: '0 * * * *' },
+              { label: 'Every 6 hours', cron: '0 */6 * * *' },
+              { label: 'Every minute (Debug)', cron: '* * * * *' },
+            ].map(preset => (
+              <button
+                type="button"
+                key={preset.cron}
+                onClick={() => handleUpdateCron(preset.cron)}
+                disabled={isUpdatingCron || status?.checkerCron === preset.cron}
+                className={`text-xs px-3 py-1.5 rounded-xl font-medium transition ${
+                  status?.checkerCron === preset.cron
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700/60'
+                }`}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <form
+          onSubmit={e => {
+            e.preventDefault();
+            if (newCron.trim()) handleUpdateCron(newCron.trim());
+          }}
+          className="pt-2 flex flex-col sm:flex-row gap-2"
+        >
+          <input
+            type="text"
+            value={newCron}
+            onChange={e => setNewCron(e.target.value)}
+            placeholder="Custom 5-field cron (e.g. */20 * * * *)"
+            className="flex-1 bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-amber-500"
+          />
+          <button
+            type="submit"
+            disabled={!newCron.trim() || isUpdatingCron}
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-xl text-xs font-semibold transition"
+          >
+            {isUpdatingCron ? 'Saving...' : 'Set Custom Cron'}
+          </button>
+        </form>
+
+        {cronMessage && (
+          <p
+            className={`text-xs ${
+              cronMessage.type === 'success' ? 'text-emerald-400' : 'text-rose-400'
+            }`}
+          >
+            {cronMessage.text}
+          </p>
+        )}
       </div>
 
       {/* Antigravity CLI Integration */}

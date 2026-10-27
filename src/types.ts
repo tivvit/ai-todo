@@ -75,6 +75,7 @@ export interface AppStatus {
     agyPath: string;
     hasAgy: boolean;
   };
+  checkerCron: string;
   counts: {
     activeCheckers: number;
     delegatedTasks: number;

@@ -52,6 +52,12 @@ db.exec(`
     postpone_until TEXT,
     created_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
 `);
 
 export interface DelegatedTask {
@@ -216,5 +222,20 @@ export const dbService = {
   getRecentDecisions(limit = 20): TaskDecision[] {
     const stmt = db.prepare('SELECT * FROM task_decisions ORDER BY id DESC LIMIT ?');
     return stmt.all(limit) as TaskDecision[];
+  },
+
+  getSetting(key: string, defaultValue = ''): string {
+    const stmt = db.prepare('SELECT value FROM app_settings WHERE key = ?');
+    const row = stmt.get(key) as { value: string } | undefined;
+    return row ? row.value : defaultValue;
+  },
+
+  setSetting(key: string, value: string): void {
+    const stmt = db.prepare(`
+      INSERT INTO app_settings (key, value, updated_at)
+      VALUES (?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `);
+    stmt.run(key, value, new Date().toISOString());
   }
 };

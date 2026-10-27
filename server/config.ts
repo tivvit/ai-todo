@@ -48,5 +48,5 @@ export const CONFIG = {
   TODOIST_API_TOKEN: resolveTodoistToken(),
   AGY_PATH: process.env.AGY_PATH || '/home/tivvit/.local/bin/agy',
   DATA_DIR: path.resolve(process.cwd(), 'data'),
-  CHECKER_CRON: process.env.CHECKER_CRON || '* * * * *', // every minute
+  CHECKER_CRON: process.env.CHECKER_CRON || '*/15 * * * *', // every 15 minutes by default
 };

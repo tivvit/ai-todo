@@ -28,7 +28,7 @@ For every single todo, you have four clear actions:
 | Decision | What It Does | Todoist Synchronization |
 | :--- | :--- | :--- |
 | **✅ Done** | Marks the task as completed immediately. | Closes the task via Todoist v1 REST API (`POST /api/v1/tasks/{id}/close`). |
-| **📝 Done with Note** | Complete with summary (e.g. ticket #, confirmation code, outcome). | Adds your note as a Todoist comment, then completes the task. |
+| **📝 Done with Note** | Complete with summary, with optional **Follow-Up Todo** creation. | Adds note as a comment, completes the task, and optionally spawns a new scheduled follow-up task in Todoist. |
 | **⏳ Postpone with Reason** | Natural language rescheduling (`tomorrow`, `in 2 days`, `next Monday`) with accountability reason. | Updates `due_string` and logs a postponement comment explaining *why* it was delayed. |
 | **🤖 Hand Over to LLM** | Delegate full task ownership to the Antigravity AI agent when you can't or don't want to do it. | Agent formulates execution plan, registers automated Checker, and syncs status comment to Todoist. |
 
@@ -156,6 +156,27 @@ npm run build
 npm start
 ```
 The unified production server will be running on `http://localhost:3333`.
+
+### 6. Docker & Jarvis Deployment
+
+AI Todo is deployed to Jarvis using Docker Compose:
+```bash
+# Build Docker image
+docker build -t ai-todo:latest .
+
+# Deploy via Jarvis Docker Compose
+docker compose -f /data/var/docker-compose.yml up -d ai-todo
+```
+
+Access surfaces on Jarvis:
+* Local Port: `http://localhost:3333`
+* Traefik Domains: `http://ai-todo.jarvis.lan` or `http://todo.jarvis.lan`
+
+---
+
+## 🧭 Skills: Deploy to Jarvis (`deploy-to-jarvis`)
+
+An Antigravity skill has been installed globally at `~/.gemini/config/skills/deploy-to-jarvis/SKILL.md` and in the repository at `.agents/skills/deploy-to-jarvis/SKILL.md`. It standardizes how services and containers are built, configured with persistent storage (`/data/var/<service>`), Traefik-routed, and orchestrated through `/data/var/docker-compose.yml`.
 
 ---
 
