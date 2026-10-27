@@ -82,7 +82,46 @@ app.post('/api/settings/checker', (req: Request, res: Response) => {
   }
 });
 
-// 2. Fetch Active Todos
+function matchesDateScope(dueDateStr: string | null | undefined, scope: string): boolean {
+  if (scope === 'all') return true;
+  if (scope === 'someday') return !dueDateStr;
+  if (scope === 'scheduled') return Boolean(dueDateStr);
+  if (!dueDateStr) return false;
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const todayStr = `${year}-${month}-${day}`;
+
+  const nextWeek = new Date(now);
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  const nextWeekStr = `${nextWeek.getFullYear()}-${String(nextWeek.getMonth() + 1).padStart(2, '0')}-${String(nextWeek.getDate()).padStart(2, '0')}`;
+
+  const d = dueDateStr.slice(0, 10);
+
+  if (scope === 'today') return d === todayStr;
+  if (scope === 'overdue') return d < todayStr;
+  if (scope === 'today_overdue') return d <= todayStr;
+  if (scope === 'near_future') return d >= todayStr && d <= nextWeekStr;
+  return true;
+}
+
+// 2. Fetch Projects List
+app.get('/api/projects', async (req: Request, res: Response) => {
+  if (!todoist.isConfigured()) {
+    res.status(400).json({ error: 'Todoist API token is not configured.' });
+    return;
+  }
+  try {
+    const projects = await todoist.getProjects();
+    res.json(projects);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Fetch Active Todos (with Project & Scope / Filter support)
 app.get('/api/todos', async (req: Request, res: Response) => {
   if (!todoist.isConfigured()) {
     res.status(400).json({
@@ -91,13 +130,45 @@ app.get('/api/todos', async (req: Request, res: Response) => {
     return;
   }
 
-  try {
-    const [tasks, projects] = await Promise.all([
-      todoist.getTasks(),
-      todoist.getProjects().catch(() => [])
-    ]);
+  const projectId = req.query.projectId ? String(req.query.projectId) : 'all';
+  const scope = req.query.scope ? String(req.query.scope) : 'all';
+  const customQuery = req.query.filterQuery ? String(req.query.filterQuery).trim() : '';
 
+  try {
+    let tasks: any[] = [];
+    const projects = await todoist.getProjects().catch(() => []);
     const projectMap = new Map(projects.map(p => [p.id, p.name]));
+
+    if (customQuery) {
+      tasks = await todoist.getTasksByFilter(customQuery);
+      if (projectId !== 'all') {
+        tasks = tasks.filter(t => t.project_id === projectId);
+      }
+    } else if (projectId === 'all') {
+      // Across all projects
+      if (scope === 'today') {
+        tasks = await todoist.getTasksByFilter('today');
+      } else if (scope === 'today_overdue') {
+        tasks = await todoist.getTasksByFilter('today | overdue');
+      } else if (scope === 'overdue') {
+        tasks = await todoist.getTasksByFilter('overdue');
+      } else if (scope === 'near_future') {
+        tasks = await todoist.getTasksByFilter('7 days');
+      } else if (scope === 'scheduled') {
+        tasks = await todoist.getTasksByFilter('!no date');
+      } else if (scope === 'someday') {
+        tasks = await todoist.getTasksByFilter('no date');
+      } else {
+        tasks = await todoist.getTasks();
+      }
+    } else {
+      // Specific project
+      tasks = await todoist.getTasks({ projectId });
+      if (scope !== 'all') {
+        tasks = tasks.filter(t => matchesDateScope(t.due?.date, scope));
+      }
+    }
+
     const delegatedMap = new Map(dbService.getDelegatedTasks().map(d => [d.task_id, d]));
     const checkers = dbService.getActiveCheckers();
     const checkerMap = new Map(checkers.map(c => [c.task_id, c]));

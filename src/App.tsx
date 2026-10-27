@@ -5,12 +5,19 @@ import { DelegatedDashboard } from './components/DelegatedDashboard';
 import { AllTasksView } from './components/AllTasksView';
 import { HistoryView } from './components/HistoryView';
 import { SettingsView } from './components/SettingsView';
-import { TodoItem, AppStatus } from './types';
+import { TodoItem, AppStatus, TodoProject, TimeScope } from './types';
 import { Loader2, AlertCircle } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<'focus' | 'all' | 'delegated' | 'history' | 'settings'>('focus');
   const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [projects, setProjects] = useState<TodoProject[]>([]);
+  const [selectedProject, setSelectedProject] = useState<string>(() => {
+    return localStorage.getItem('ai_todo_project') || 'all';
+  });
+  const [timeScope, setTimeScope] = useState<TimeScope>(() => {
+    return (localStorage.getItem('ai_todo_scope') as TimeScope) || 'today_overdue';
+  });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,17 +35,28 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  const fetchTodos = useCallback(async () => {
+  const fetchProjects = useCallback(async () => {
+    try {
+      const res = await fetch('/api/projects');
+      if (res.ok) {
+        const data = await res.json();
+        setProjects(data);
+      }
+    } catch (err: any) {
+      console.error('Error fetching projects:', err);
+    }
+  }, []);
+
+  const fetchTodos = useCallback(async (proj = selectedProject, scope = timeScope) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/todos');
+      const query = new URLSearchParams({ projectId: proj, scope });
+      const res = await fetch(`/api/todos?${query.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setTodos(data);
-        if (currentIndex >= data.length) {
-          setCurrentIndex(0);
-        }
+        setCurrentIndex(0);
       } else {
         const errData = await res.json().catch(() => ({}));
         setError(errData.error || 'Failed to fetch tasks from Todoist');
@@ -48,12 +66,25 @@ export const App: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentIndex]);
+  }, [selectedProject, timeScope]);
+
+  const handleSelectProject = (proj: string) => {
+    setSelectedProject(proj);
+    localStorage.setItem('ai_todo_project', proj);
+    fetchTodos(proj, timeScope);
+  };
+
+  const handleSelectTimeScope = (scope: TimeScope) => {
+    setTimeScope(scope);
+    localStorage.setItem('ai_todo_scope', scope);
+    fetchTodos(selectedProject, scope);
+  };
 
   useEffect(() => {
     fetchStatus();
+    fetchProjects();
     fetchTodos();
-  }, [fetchStatus, fetchTodos]);
+  }, [fetchStatus, fetchProjects, fetchTodos]);
 
   // Actions
   const handleDone = async (task: TodoItem) => {
@@ -214,18 +245,31 @@ export const App: React.FC = () => {
                 todos={todos}
                 currentIndex={currentIndex}
                 setCurrentIndex={setCurrentIndex}
+                projects={projects}
+                selectedProject={selectedProject}
+                onSelectProject={handleSelectProject}
+                timeScope={timeScope}
+                onSelectTimeScope={handleSelectTimeScope}
+                loading={loading}
                 onDone={handleDone}
                 onDoneWithNote={handleDoneWithNote}
                 onPostpone={handlePostpone}
                 onDelegate={handleDelegate}
                 onAIDone={handleAIDone}
-                onRefresh={fetchTodos}
+                onRefresh={() => fetchTodos(selectedProject, timeScope)}
               />
             )}
 
             {currentTab === 'all' && (
               <AllTasksView
                 todos={todos}
+                projects={projects}
+                selectedProject={selectedProject}
+                onSelectProject={handleSelectProject}
+                timeScope={timeScope}
+                onSelectTimeScope={handleSelectTimeScope}
+                loading={loading}
+                onRefresh={() => fetchTodos(selectedProject, timeScope)}
                 onSelectTask={idx => {
                   setCurrentIndex(idx);
                   setCurrentTab('focus');

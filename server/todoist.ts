@@ -90,9 +90,55 @@ export class TodoistService {
     return (await response.text()) as unknown as T;
   }
 
-  async getTasks(): Promise<TodoistTask[]> {
-    const data = await this.request<{ results: TodoistTask[] }>('/tasks');
-    return data.results || [];
+  async getTasks(options?: { projectId?: string; maxPages?: number }): Promise<TodoistTask[]> {
+    const allTasks: TodoistTask[] = [];
+    let cursor: string | null = null;
+    let pages = 0;
+    const maxPages = options?.maxPages ?? 3;
+
+    do {
+      pages++;
+      const queryParams = new URLSearchParams();
+      if (options?.projectId && options.projectId !== 'all') {
+        queryParams.set('project_id', options.projectId);
+      }
+      if (cursor) {
+        queryParams.set('cursor', cursor);
+      }
+      const qs = queryParams.toString();
+      const endpoint = `/tasks${qs ? `?${qs}` : ''}`;
+      const data = await this.request<{ results: TodoistTask[]; next_cursor?: string | null }>(endpoint);
+      if (data.results && data.results.length > 0) {
+        allTasks.push(...data.results);
+      }
+      cursor = data.next_cursor || null;
+      if (pages >= maxPages || !cursor) break;
+    } while (cursor);
+
+    return allTasks;
+  }
+
+  async getTasksByFilter(query: string, maxPages = 3): Promise<TodoistTask[]> {
+    const allTasks: TodoistTask[] = [];
+    let cursor: string | null = null;
+    let pages = 0;
+
+    do {
+      pages++;
+      const queryParams = new URLSearchParams({ query });
+      if (cursor) {
+        queryParams.set('cursor', cursor);
+      }
+      const endpoint = `/tasks/filter?${queryParams.toString()}`;
+      const data = await this.request<{ results: TodoistTask[]; next_cursor?: string | null }>(endpoint);
+      if (data.results && data.results.length > 0) {
+        allTasks.push(...data.results);
+      }
+      cursor = data.next_cursor || null;
+      if (pages >= maxPages || !cursor) break;
+    } while (cursor);
+
+    return allTasks;
   }
 
   async getTask(taskId: string): Promise<TodoistTask> {

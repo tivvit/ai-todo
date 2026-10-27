@@ -1,35 +1,46 @@
 import React, { useState } from 'react';
 import {
   CheckCircle2,
-  FileText,
-  Clock,
-  Bot,
   Search,
-  Filter,
-  ExternalLink,
   Calendar,
-  AlertTriangle
+  AlertTriangle,
+  Bot
 } from 'lucide-react';
-import { TodoItem } from '../types';
+import { TodoItem, TodoProject, TimeScope } from '../types';
+import { ScopeFilterBar } from './ScopeFilterBar';
 
 interface AllTasksViewProps {
   todos: TodoItem[];
+  projects: TodoProject[];
+  selectedProject: string;
+  onSelectProject: (projectId: string) => void;
+  timeScope: TimeScope;
+  onSelectTimeScope: (scope: TimeScope) => void;
+  loading?: boolean;
+  onRefresh?: () => void;
   onSelectTask: (index: number) => void;
   onDone: (task: TodoItem) => Promise<void>;
 }
 
-export const AllTasksView: React.FC<AllTasksViewProps> = ({ todos, onSelectTask, onDone }) => {
+export const AllTasksView: React.FC<AllTasksViewProps> = ({
+  todos,
+  projects,
+  selectedProject,
+  onSelectProject,
+  timeScope,
+  onSelectTimeScope,
+  loading = false,
+  onRefresh,
+  onSelectTask,
+  onDone
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedProject, setSelectedProject] = useState('all');
-
-  const projects = Array.from(new Set(todos.map(t => t.projectName)));
 
   const filtered = todos.filter(t => {
     const matchesSearch =
       t.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
       t.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesProject = selectedProject === 'all' || t.projectName === selectedProject;
-    return matchesSearch && matchesProject;
+    return matchesSearch;
   });
 
   return (
@@ -43,7 +54,7 @@ export const AllTasksView: React.FC<AllTasksViewProps> = ({ todos, onSelectTask,
           </p>
         </div>
 
-        {/* Search & Filter */}
+        {/* Search */}
         <div className="flex items-center space-x-3">
           <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
@@ -51,31 +62,30 @@ export const AllTasksView: React.FC<AllTasksViewProps> = ({ todos, onSelectTask,
               type="text"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              placeholder="Search tasks..."
+              placeholder="Search in current view..."
               className="bg-slate-900 border border-slate-700/80 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
             />
           </div>
-
-          <select
-            value={selectedProject}
-            onChange={e => setSelectedProject(e.target.value)}
-            className="bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
-          >
-            <option value="all">All Projects</option>
-            {projects.map(p => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
+
+      {/* Scope and Project Filtering Toolbar */}
+      <ScopeFilterBar
+        projects={projects}
+        selectedProject={selectedProject}
+        onSelectProject={onSelectProject}
+        timeScope={timeScope}
+        onSelectTimeScope={onSelectTimeScope}
+        taskCount={filtered.length}
+        loading={loading}
+        onRefresh={onRefresh}
+      />
 
       {/* Task List */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-800/80 shadow-xl">
         {filtered.length === 0 ? (
           <div className="py-12 text-center text-slate-400 text-sm">
-            No matching tasks found.
+            No matching tasks found for this search/filter.
           </div>
         ) : (
           filtered.map((task, idx) => (

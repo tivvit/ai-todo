@@ -13,12 +13,19 @@ import {
   ExternalLink,
   Loader2
 } from 'lucide-react';
-import { TodoItem, TodoComment } from '../types';
+import { TodoItem, TodoComment, TodoProject, TimeScope } from '../types';
+import { ScopeFilterBar } from './ScopeFilterBar';
 
 interface FocusViewProps {
   todos: TodoItem[];
   currentIndex: number;
   setCurrentIndex: (index: number | ((prev: number) => number)) => void;
+  projects: TodoProject[];
+  selectedProject: string;
+  onSelectProject: (projectId: string) => void;
+  timeScope: TimeScope;
+  onSelectTimeScope: (scope: TimeScope) => void;
+  loading?: boolean;
   onDone: (task: TodoItem) => Promise<void>;
   onDoneWithNote: (
     task: TodoItem,
@@ -35,6 +42,12 @@ export const FocusView: React.FC<FocusViewProps> = ({
   todos,
   currentIndex,
   setCurrentIndex,
+  projects,
+  selectedProject,
+  onSelectProject,
+  timeScope,
+  onSelectTimeScope,
+  loading = false,
   onDone,
   onDoneWithNote,
   onPostpone,
@@ -160,20 +173,51 @@ export const FocusView: React.FC<FocusViewProps> = ({
 
   if (!currentTask || todos.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
-        <div className="w-16 h-16 bg-emerald-500/10 text-emerald-400 rounded-2xl flex items-center justify-center mb-4 border border-emerald-500/20 shadow-lg shadow-emerald-500/10">
-          <CheckCircle2 className="w-8 h-8" />
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        <ScopeFilterBar
+          projects={projects}
+          selectedProject={selectedProject}
+          onSelectProject={onSelectProject}
+          timeScope={timeScope}
+          onSelectTimeScope={onSelectTimeScope}
+          taskCount={0}
+          loading={loading}
+          onRefresh={onRefresh}
+        />
+
+        <div className="flex flex-col items-center justify-center py-16 px-4 text-center bg-slate-900 border border-slate-800 rounded-3xl shadow-xl">
+          <div className="w-16 h-16 bg-emerald-500/10 text-emerald-400 rounded-2xl flex items-center justify-center mb-4 border border-emerald-500/20 shadow-lg shadow-emerald-500/10">
+            <CheckCircle2 className="w-8 h-8" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Queue Clear!</h2>
+          <p className="text-slate-400 max-w-md mb-6 text-sm">
+            No active tasks found matching this project and time horizon. Great job staying on top of your priorities!
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => onSelectTimeScope('all')}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition shadow-lg shadow-indigo-600/20"
+            >
+              Show All Tasks
+            </button>
+            <button
+              onClick={() => {
+                onSelectProject('all');
+                onSelectTimeScope('all');
+              }}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition"
+            >
+              Reset to All Projects & Tasks
+            </button>
+            <button
+              onClick={onRefresh}
+              disabled={loading}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold border border-slate-700 transition"
+            >
+              Check for New Todos
+            </button>
+          </div>
         </div>
-        <h2 className="text-2xl font-bold text-white mb-2">Inbox Zero Reached!</h2>
-        <p className="text-slate-400 max-w-md mb-6 text-sm">
-          You've triaged all active tasks in your queue. Great job staying on top of your priorities.
-        </p>
-        <button
-          onClick={onRefresh}
-          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold transition shadow-lg shadow-indigo-600/20"
-        >
-          Check for New Todos
-        </button>
       </div>
     );
   }
@@ -190,6 +234,17 @@ export const FocusView: React.FC<FocusViewProps> = ({
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
+      {/* Scope and Project Filtering Toolbar */}
+      <ScopeFilterBar
+        projects={projects}
+        selectedProject={selectedProject}
+        onSelectProject={onSelectProject}
+        timeScope={timeScope}
+        onSelectTimeScope={onSelectTimeScope}
+        taskCount={todos.length}
+        loading={loading}
+        onRefresh={onRefresh}
+      />
       {/* Progress Header */}
       <div className="mb-6 flex items-center justify-between text-xs text-slate-400">
         <div className="flex items-center space-x-2">

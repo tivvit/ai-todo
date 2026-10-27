@@ -83,6 +83,15 @@ export interface AppStatus {
   };
 }
 
+export interface TodoProject {
+  id: string;
+  name: string;
+  color?: string;
+  is_favorite?: boolean;
+}
+
+export type TimeScope = 'all' | 'today_overdue' | 'today' | 'near_future' | 'scheduled' | 'someday';
+
 export interface TodoComment {
   id: string;
   content: string;
